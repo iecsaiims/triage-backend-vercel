@@ -12,7 +12,7 @@ exports.createEdConsultation = async (req, res) => {
     });
     const consultation = await EdConsultation.create({
       ...req.body,
-      consultationImage: req.file.filename,
+      consultationImage: req.file ? req.file.filename : null,
       submittedBy: req.user.user,
       designation:req.user.designation
     });

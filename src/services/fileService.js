@@ -5,6 +5,6 @@ exports.attachFileUrl = (record, req, field) => {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   return {
     ...record.toJSON(),
-    [`${field}_url`]: `${baseUrl}/api/files/${record[field]}`
+    [`${field}_url`]: `${baseUrl}/api/files/${encodeURIComponent(record[field])}`
   };
 };

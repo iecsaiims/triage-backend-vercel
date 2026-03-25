@@ -1,20 +1,21 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const path = require('path');
-const fs = require('fs');
-const authMiddleware = require('../middlewares/authMiddleware'); // Your JWT verify middleware
+const authMiddleware = require("../middlewares/authMiddleware");
+const { sendStoredFile } = require("../services/storageService");
 
 // GET /api/files/:filename
-router.get('/:filename', (req, res) => {
-  const { filename } = req.params;
+router.get("/:filename", authMiddleware, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const fileWasSent = await sendStoredFile(filename, res);
 
-  const filePath = path.join(__dirname, '../../uploads', filename);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'File not found' });
+    if (!fileWasSent) {
+      return res.status(404).json({ error: "File not found" });
+    }
+  } catch (error) {
+    console.error("Failed to fetch file:", error);
+    return res.status(500).json({ error: "File fetch failed" });
   }
-
-  res.sendFile(filePath);
 });
 
 module.exports = router;

@@ -1,20 +1,20 @@
-const fs = require('fs');
-const path = require('path');
+const {
+  buildStoredFilename,
+  persistFile,
+} = require("../services/storageService");
 
-function renameUploadedFile(fieldName = 'name') {
-  return (req, res, next) => {
+function renameUploadedFile(fieldName = "name") {
+  return async (req, res, next) => {
     if (!req.file) return next();
 
-    const patientName = (req.body[fieldName] || 'unknown').trim();
-    const safeName = patientName.replace(/[^a-z0-9_\-]/gi, '_');
-    const oldPath = req.file.path;
-    const newFilename = `${safeName}-${Date.now()}-${req.file.originalname}`;
-    const newPath = path.join(path.dirname(oldPath), newFilename);
-
     try {
-      fs.renameSync(oldPath, newPath);
-      req.file.filename = newFilename;
-      req.file.path = newPath;
+      const storedFilename = buildStoredFilename(
+        req.body[fieldName],
+        req.file.originalname
+      );
+      const persistedFilename = await persistFile(req.file, storedFilename);
+
+      req.file.filename = persistedFilename;
       next();
     } catch (err) {
       next(err);

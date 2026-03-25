@@ -1,35 +1,55 @@
-const multer = require('multer');
-//const path = require('path');
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
+const {
+  storageMode,
+  LOCAL_STORAGE,
+} = require("../services/storageService");
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-        //const folder = file.mimetype.startsWith('image/') ? 'images' : 'documents';
-        //cb(null, path.join(__dirname, '../uploads/', folder));
-    },
-    // filename:(req, file , cb) =>{
-    //    // const ext = path.extname(file.originalname);
-    //    // const name = path.basename(file.originalname, ext).replace(/\s+/g, '_');
-    //    const patientName = req.formFields ? req.formFields.name : 'unknown';
-    //     cb(null, `${patientName}-${Date.now()}-${file.originalname}`);
-    // }  
-    filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+const localUploadPath = path.resolve(
+  process.cwd(),
+  process.env.UPLOAD_DIR || "uploads"
+);
+
+if (storageMode === LOCAL_STORAGE && !fs.existsSync(localUploadPath)) {
+  fs.mkdirSync(localUploadPath, { recursive: true });
 }
-});
 
-const fileFilter = (req, file, cb) =>{
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-    if(allowedTypes.includes(file.mimetype)){
-        cb(null,true);
-    }else{
-        cb(new Error('Invalid file type. Only jpeg, jpg and pdf file type allowed.'));
-    }
+const storage =
+  storageMode === LOCAL_STORAGE
+    ? multer.diskStorage({
+        destination: (req, file, cb) => {
+          cb(null, localUploadPath);
+        },
+        filename: (req, file, cb) => {
+          cb(null, `${Date.now()}-${file.originalname}`);
+        },
+      })
+    : multer.memoryStorage();
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "application/pdf",
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error("Invalid file type. Only jpeg, jpg, png, and pdf files are allowed.")
+    );
+  }
 };
 
 const upload = multer({
-    storage:storage,
-    fileFilter:fileFilter
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: Number(process.env.MAX_UPLOAD_SIZE_BYTES || 4194304),
+  },
 });
 
 module.exports = upload;

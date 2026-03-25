@@ -1,14 +1,45 @@
 const express = require("express");
-const app = express();
 const cors = require("cors");
-const path = require("path");
 require("dotenv").config();
-
-app.use(cors());
-
-// app.use('/uploads', express.static('uploads'));
-
 const { sequelize } = require("./src/models");
+
+const app = express();
+
+const normalizeOrigin = (origin) => origin.replace(/\/+$/, "");
+
+const parseCorsOrigins = (value) => {
+  if (!value) {
+    return true;
+  }
+
+  const allowedOrigins = value
+    .split(",")
+    .map((origin) => normalizeOrigin(origin.trim()))
+    .filter(Boolean);
+
+  if (!allowedOrigins.length) {
+    return true;
+  }
+
+  return (origin, callback) => {
+    const normalizedOrigin = origin ? normalizeOrigin(origin) : origin;
+
+    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("CORS origin not allowed"));
+  };
+};
+
+app.use(
+  cors({
+    origin: parseCorsOrigins(process.env.CORS_ORIGIN),
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: process.env.JSON_LIMIT || "1mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 const authRoutes = require("./src/routes/authRoutes");
 const patientRoutes = require("./src/routes/patientRoutes");
@@ -26,38 +57,65 @@ const consultationRoutes = require("./src/routes/consultationRoutes.js");
 const diagnosisRoutes = require("./src/routes/diagnosisRoutes.js");
 const encRoutes = require("./src/routes/encRoutes.js");
 const doctorWorkflowRoutes = require("./src/routes/doctorWorkflowRoutes");
-app.use((req, res, next) => {
-  console.log("Headers:", req.headers);
-  console.log("Body:", req.body);
-  next();
+
+if (process.env.LOG_REQUESTS === "true") {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.originalUrl}`);
+    next();
+  });
+}
+
+app.get("/", (req, res) => {
+  res.status(200).json({ message: "Triage backend is running" });
 });
 
-app.use("/api/auth", express.json(), authRoutes);
-app.use("/api/patient", express.json(), patientRoutes);
-app.use("/api/primary-assessment", express.json(), primaryAssessmentRoutes);
-app.use("/api/templates", express.json(), doctorNotesRoutes);
+app.get("/api/health", async (req, res) => {
+  try {
+    await sequelize.authenticate();
+    res.status(200).json({ status: "ok" });
+  } catch (error) {
+    console.error("Health check failed:", error);
+    res.status(500).json({ status: "error" });
+  }
+});
+
+app.use("/api/auth", authRoutes);
+app.use("/api/patient", patientRoutes);
+app.use("/api/primary-assessment", primaryAssessmentRoutes);
+app.use("/api/templates", doctorNotesRoutes);
 app.use("/api/poc-tests", pointOfCareRoutes);
-app.use("/api/disposition", express.json(), dispositionRoutes);
+app.use("/api/disposition", dispositionRoutes);
 app.use("/api/files", fileRoutes);
-app.use("/api/investigation", express.json(), investigationRoutes);
-app.use("/api/treatment", express.json(), treatmentDetailsRoutes);
-app.use("/api/vitals", express.json(), vitalsRoutes);
-app.use("/api/inout", express.json(), InOutRoutes);
-app.use("/api/handover-notes", express.json(), handoverNotesRoutes);
+app.use("/api/investigation", investigationRoutes);
+app.use("/api/treatment", treatmentDetailsRoutes);
+app.use("/api/vitals", vitalsRoutes);
+app.use("/api/inout", InOutRoutes);
+app.use("/api/handover-notes", handoverNotesRoutes);
 app.use("/api/ed-consultation", consultationRoutes);
-app.use("/api/diagnosis", express.json(), diagnosisRoutes);
-app.use("/api", express.json(), doctorWorkflowRoutes);
-const PORT = process.env.PORT || 3003;
+app.use("/api/diagnosis", diagnosisRoutes);
+app.use("/api", doctorWorkflowRoutes);
+
 app.get("/api/test", async (req, res) => {
   res.status(200).json({ message: "API is working" });
 });
 
-app.use("/api/enc", express.json(), encRoutes);
+app.use("/api/enc", encRoutes);
 
-sequelize
-  .sync()
-  .then(() => {
-    console.log("Database synced");
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch((err) => console.error("DB sync error:", err));
+app.use((err, req, res, next) => {
+  if (err?.message === "CORS origin not allowed") {
+    return res.status(403).json({ error: err.message });
+  }
+
+  if (err?.name === "MulterError") {
+    return res.status(400).json({ error: err.message });
+  }
+
+  if (err) {
+    console.error("Unhandled error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+
+  next();
+});
+
+module.exports = app;
