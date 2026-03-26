@@ -1,4 +1,5 @@
 const { Sequelize } = require("sequelize");
+const pg = require("pg");
 require("dotenv").config();
 
 const DEFAULT_LOCAL_PORT = 5432;
@@ -32,6 +33,7 @@ const shouldUseSsl =
 
 const sequelize = new Sequelize(databaseUrl, {
   dialect: "postgres",
+  dialectModule: pg,
   logging: process.env.DB_LOGGING === "true" ? console.log : false,
   dialectOptions: shouldUseSsl
     ? {
