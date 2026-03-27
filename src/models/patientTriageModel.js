@@ -62,6 +62,22 @@ const PatientTriage = sequelize.define(
       type: DataTypes.JSON,
       allowNull: true,
     },
+    decisionPayload: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    protocolVersion: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+    },
+    autoTriageCategory: {
+      type: DataTypes.STRING(16),
+      allowNull: true,
+    },
+    autoTriageReasons: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
     triageTimeStamp: {
       type: DataTypes.DATE,
       allowNull: false,
